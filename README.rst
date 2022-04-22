@@ -45,7 +45,7 @@ Building it
 Use the `xcaddy` tool to build a version of caddy with this module::
 
     xcaddy build \
-        --with github.com/delfick/caddy_php_fpm
+        --with github.com/delfick/caddy-php-fpm
 
 Credits
 -------

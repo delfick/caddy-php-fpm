@@ -1,0 +1,40 @@
+#!/bin/bash
+
+set -e
+
+echo ""
+echo "### Building final image"
+echo ""
+
+if [[ -z "$REVISION" ]]; then
+    echo "Please specify \$REVISION"
+    exit 1
+fi
+
+if [[ ! -d "$1" ]]; then
+    echo "Pass in a directory where context for final image is as first argument"
+    exit 1
+fi
+CONTEXT="$1"
+
+if command -v podman >/dev/null; then
+    DOCKER=$(command -v podman)
+elif command -v docker >/dev/null; then
+    DOCKER=$(command -v docker)
+else
+    echo "Couldn't find podman or docker"
+    exit 1
+fi
+
+if [[ "$FINAL_IMAGE_NAME" == "us.gcr"* ]]; then
+    TAGS="-t ${FINAL_IMAGE_NAME}:${REVISION} -t ${FINAL_IMAGE_NAME}:latest"
+    CACHEOPTIONS="--cache-from ${FINAL_IMAGE_NAME}:latest"
+    $DOCKER pull ${FINAL_IMAGE_NAME}:latest
+else
+    TAGS="-t ${FINAL_IMAGE_NAME}"
+    CACHEOPTIONS=""
+fi
+
+cd $CONTEXT
+export ROOT_IMAGE=$(cat ROOT_IMAGE)
+$DOCKER build --build-arg "root_image=$ROOT_IMAGE" $TAGS $CACHEOPTIONS -f Containerfile .

@@ -1,0 +1,35 @@
+#!/bin/bash
+
+set -e
+
+echo "### Deploying Google Cloud Run"
+
+if [[ -z $SERVICE_ACCOUNT ]]; then
+    echo "Please make sure you have set SERVICE_ACCOUNT"
+fi
+
+if [[ -z $MEMCACHED_SESSION_STORAGE_SAVE_PATH ]]; then
+    echo "Please make sure you have set MEMCACHED_SESSION_STORAGE_SAVE_PATH"
+fi
+
+ENV="APPLICATION_ENV=deployed"
+ENV="$ENV,MEMCACHED_SESSION_STORAGE_SAVE_HANDLER=memcached"
+ENV="$ENV,MEMCACHED_SESSION_STORAGE_SAVE_PATH=$MEMCACHED_SESSION_STORAGE_SAVE_PATH"
+ENV="$ENV,OPCACHE_ENABLE=1"
+ENV="$ENV,CADDY_LOG_OUTPUT=discard"
+ENV="$ENV,WEBSITE_DISPLAY_ERRORS=off"
+ENV="$ENV,WEBSITE_LOG_ERRORS=on"
+ENV="$ENV,DEPLOYED_TO_CLOUD_RUN=1"
+
+gcloud run deploy $SERVICE_NAME \
+    --service-account $SERVICE_ACCOUNT \
+    --image=$1 \
+    --region $REGION \
+    --platform managed \
+    --ingress internal-and-cloud-load-balancing \
+    --allow-unauthenticated \
+    --project $PROJECT_ID \
+    --min-instances 1 \
+    --set-env-vars "$ENV" \
+    --concurrency 20 \
+    --port 8087

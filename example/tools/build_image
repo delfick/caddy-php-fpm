@@ -1,0 +1,23 @@
+#!/bin/bash
+
+set -e
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+if ! which podman >/dev/null; then
+    echo "You need podman, https://podman.io/getting-started/installation"
+    exit 1
+fi
+
+TEMPD=$(mktemp -d)
+FINAL=$(mktemp -d)
+trap "rm -rf $TEMPD $FINAL" EXIT
+
+export PASS1_IMAGE_NAME=website-pass1
+export FINAL_IMAGE_NAME=website-final
+export CADDY_IMAGE=website-caddy
+export REVISION=$(git rev-parse HEAD)
+
+$DIR/building/make_caddy
+$DIR/building/make_bundle "$TEMPD" "$FINAL"
+$DIR/building/make_final "$FINAL"

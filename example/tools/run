@@ -1,0 +1,27 @@
+#!/bin/bash
+
+set -e
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+if ! which caddy >/dev/null; then
+    echo "You need caddy"
+    exit 1
+fi
+
+if [[ -z $GOOGLE_APPLICATION_CREDENTIALS && ! -n $DEPLOYED ]]; then
+    echo "Please set GOOGLE_APPLICATION_CREDENTIALS"
+    exit 1
+fi
+
+cd $DIR/runtime_config
+export WEBSITE_LOG_ERRORS='on'
+export WEBSITE_DISPLAY_ERRORS='on'
+export CADDY_LOG_OUTPUT=stderr
+export MEMCACHED_SESSION_STORAGE_SAVE_HANDLER=files
+export MEMCACHED_SESSION_STORAGE_SAVE_PATH=""
+export APPLICATION_ENV=development
+export OPCACHE_ENABLE=0
+export DEPLOYED_TO_CLOUD_RUN=1
+# export XDEBUG_SESSION=1
+caddy run

@@ -1,0 +1,24 @@
+ARG root_image
+
+FROM $root_image
+
+ADD /usr_bin_caddy /usr/bin/caddy
+ADD /usr_sbin_php-fpm7 /usr/sbin/php-fpm
+RUN chmod +x /usr/bin/caddy /usr/sbin/php-fpm
+
+RUN rm -rf /lib /usr/lib
+ADD /lib.tar /
+ADD /usr_lib.tar /usr
+
+ADD /etc_php7 /etc/php7
+ADD /project /project
+
+ENV XDG_CONFIG_HOME /caddy-config
+RUN mkdir -p /project/runtime /assets-manifest-cache /caddy-config
+WORKDIR /project/tools/runtime_config
+
+RUN adduser -D -H website
+RUN chown website -R /project/runtime /assets-manifest-cache /caddy-config
+USER website
+
+CMD ["/usr/bin/caddy", "run"]

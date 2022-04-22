@@ -1,0 +1,13 @@
+{
+  "name": "website/website",
+  "description": "A website",
+  "autoload": {
+    "psr-4": {
+      "Website\\App\\": "app/App"
+    }
+  },
+  "require": {
+    "opencensus/opencensus": "^0.7.0",
+    "monolog/monolog": "^2.5"
+  }
+}

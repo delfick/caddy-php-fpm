@@ -1,0 +1,87 @@
+#!/bin/bash
+
+set -e
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+ROOT="$DIR/../.."
+
+echo ""
+echo "### Building first pass Container context"
+echo ""
+
+if [[ ! -d "$1" ]]; then
+    echo "Pass in a directory to place everything as first argument"
+    exit 1
+fi
+CONTEXT="$1"
+
+if [[ ! -d "$2" ]]; then
+    echo "Pass in a directory to place final context in as second argument"
+    exit 1
+fi
+DEST="$2"
+
+mkdir -p $CONTEXT/webserver
+cp $ROOT/php/{composer.json,composer.lock} $CONTEXT/webserver/
+
+if command -v podman >/dev/null; then
+    DOCKER=$(command -v podman)
+elif command -v docker >/dev/null; then
+    DOCKER=$(command -v docker)
+else
+    echo "Couldn't find podman or docker"
+    exit 1
+fi
+
+if [[ -z "$PASS1_IMAGE_NAME" ]]; then
+    echo "Please specify \$PASS1_IMAGE_NAME"
+    exit 1
+fi
+
+if [[ -z "$CADDY_IMAGE" ]]; then
+    echo "Please specify \$CADDY_IMAGE"
+    exit 1
+fi
+
+if [[ "$PASS1_IMAGE_NAME" == "gcr"* ]]; then
+    TAGS="-t ${PASS1_IMAGE_NAME}"
+    CACHEOPTIONS="--cache-from ${PASS1_IMAGE_NAME}"
+    $DOCKER pull ${PASS1_IMAGE_NAME} || true
+else
+    TAGS="-t ${PASS1_IMAGE_NAME}"
+    CACHEOPTIONS=""
+fi
+
+cp $ROOT/tools/building/containers/pass1/Containerfile $CONTEXT
+(
+    cd $CONTEXT
+    $DOCKER build --build-arg "caddy_builder=$CADDY_IMAGE" $TAGS $CACHEOPTIONS -f Containerfile .
+)
+
+if [[ "$PASS1_IMAGE_NAME" == "gcr"* ]]; then
+    $DOCKER push ${PASS1_IMAGE_NAME}
+fi
+
+echo ""
+echo "### Making final context"
+echo ""
+
+container_id=$($DOCKER create "$PASS1_IMAGE_NAME")
+trap "$DOCKER rm $container_id >/dev/null" EXIT
+
+$DOCKER cp "$container_id:/project" "$DEST/project"
+$DOCKER cp "$container_id:/etc/php7" "$DEST/etc_php7"
+$DOCKER cp "$container_id:/usr/bin/caddy" "$DEST/usr_bin_caddy"
+$DOCKER cp "$container_id:/usr/sbin/php-fpm7" "$DEST/usr_sbin_php-fpm7"
+$DOCKER cp "$container_id:/lib" - > "$DEST/lib.tar"
+$DOCKER cp "$container_id:/usr/lib" - > "$DEST/usr_lib.tar"
+
+cp -R $ROOT/php/app $DEST/project/php
+cp -R $ROOT/php/website $DEST/project/php
+
+mkdir -p $DEST/project/tools
+cp -R $ROOT/tools/runtime_config $DEST/project/tools/runtime_config
+
+cp $ROOT/tools/building/containers/final/Containerfile $DEST
+
+$DOCKER inspect --format='{{index .RepoDigests 0}}' caddy:2.4.6 > $DEST/ROOT_IMAGE

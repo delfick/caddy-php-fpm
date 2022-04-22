@@ -1,0 +1,41 @@
+#!/bin/bash
+
+set -e
+
+echo ""
+echo "### Making Caddy binary"
+echo ""
+
+if command -v podman >/dev/null; then
+    DOCKER=$(command -v podman)
+elif command -v docker >/dev/null; then
+    DOCKER=$(command -v docker)
+else
+    echo "Couldn't find podman or docker"
+    exit 1
+fi
+
+if [[ -z "$CADDY_IMAGE" ]]; then
+    echo "Please specify \$CADDY_IMAGE"
+    exit 1
+fi
+
+if [[ $CADDY_IMAGE == "gcr"* ]]; then
+    echo "Found gcr caddy image, will add cache options and docker pull: $CADDY_IMAGE"
+    CACHEOPTIONS="--cache-from $CADDY_IMAGE"
+    $DOCKER pull $CADDY_IMAGE || true
+else
+    CACHEOPTIONS=""
+fi
+
+$DOCKER build -t $CADDY_IMAGE $CACHEOPTIONS - <<EOF
+FROM caddy:2.4.6-builder AS caddybuilder
+
+RUN xcaddy build \
+    --with github.com/delfick/caddy-php-fpm@v0.6.0 \
+    --with github.com/leodido/caddy-jsonselect-encoder
+EOF
+
+if [[ $CADDY_IMAGE == "gcr"* ]]; then
+    $DOCKER push $CADDY_IMAGE
+fi

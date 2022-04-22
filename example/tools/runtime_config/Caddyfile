@@ -1,0 +1,52 @@
+{
+	admin off
+	auto_https off
+	php_fpm {
+		cmd php-fpm -p . -c . -y fpm.conf -F
+		sock_location ../../runtime/fpm.sock
+	}
+
+	log {
+		format json {
+			time_key "time"
+			level_key "severity"
+			message_key "message"
+			level_format "upper"
+			time_format "rfc3339_nano"
+		}
+	}
+}
+
+:8087 {
+	@trailing-slash {
+		path_regexp dir (.+)/$
+	}
+	rewrite @trailing-slash {re.dir.1}
+
+	root * ../../php/website
+
+	try_files {path} {path}.php {path}/index.php =404
+	php_fastcgi unix/../../runtime/fpm.sock
+
+	log {
+		output {$CADDY_LOG_OUTPUT}
+		format jsonselect "{severity:level} {timestamp:ts} {logName:logger} {httpRequest>requestMethod:request>method} {httpRequest>protocol:request>proto} {httpRequest>status:status} {httpRequest>responseSize:size} {httpRequest>userAgent:request>headers>User-Agent>[0]} {httpRequest>requestUrl:request>uri}" "{httpRequest>referrer:request>headers>Referer>[0]}" {
+			level_format "upper"
+			time_format "rfc3339_nano"
+		}
+	}
+
+	encode zstd gzip
+
+	handle_errors {
+		@404 {
+			expression {http.error.status_code} == 404
+		}
+		rewrite @404 /not-found.php
+		reverse_proxy @404 unix/../../runtime/fpm.sock {
+			transport fastcgi {
+				split .php
+			}
+		}
+	}
+}
